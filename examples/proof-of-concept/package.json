@@ -1,0 +1,7 @@
+{
+  "name": "proof-of-concept",
+  "packageManager": "yarn@3.1.1",
+  "dependencies": {
+    "@koreanwglasses/commons-core": "workspace:^"
+  }
+}

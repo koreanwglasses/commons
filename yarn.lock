@@ -687,10 +687,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bson@npm:*":
+  version: 4.0.5
+  resolution: "@types/bson@npm:4.0.5"
+  dependencies:
+    "@types/node": "*"
+  checksum: f6c74a68eec836010170e7091399b45fe39e2f7724372441cc00a0fbd0b9f44d901688504174d558edbf220922fa0c7c52fbc4aa0f2136194fa713101b8f2ec9
+  languageName: node
+  linkType: hard
+
 "@types/component-emitter@npm:^1.2.10":
   version: 1.2.11
   resolution: "@types/component-emitter@npm:1.2.11"
   checksum: 0e081c5f7a4b113af3732f67ad9ebb487d5c239d440d96938ff9a679d18bb9337a513638e12b5b02a7a921494eef18c5a4d78f1188bc43a12290edd74c42a9c7
+  languageName: node
+  linkType: hard
+
+"@types/connect-mongodb-session@npm:^2.4.2":
+  version: 2.4.2
+  resolution: "@types/connect-mongodb-session@npm:2.4.2"
+  dependencies:
+    "@types/express-session": "*"
+    "@types/mongodb": ^3.6.20
+  checksum: 40e5ce3167509804d7f4a67c5667fd1afe71ea214545b9c8f904aef4584bc7d9d4e9bb3c72fe8104ef61092f89a06c3fab717cff36dd9b4014f996c57c5731cf
   languageName: node
   linkType: hard
 
@@ -735,7 +754,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/express-session@npm:^1.17.4":
+"@types/express-session@npm:*, @types/express-session@npm:^1.17.4":
   version: 1.17.4
   resolution: "@types/express-session@npm:1.17.4"
   dependencies:
@@ -783,6 +802,16 @@ __metadata:
   version: 1.3.2
   resolution: "@types/mime@npm:1.3.2"
   checksum: 0493368244cced1a69cb791b485a260a422e6fcc857782e1178d1e6f219f1b161793e9f87f5fae1b219af0f50bee24fcbe733a18b4be8fdd07a38a8fb91146fd
+  languageName: node
+  linkType: hard
+
+"@types/mongodb@npm:^3.6.20":
+  version: 3.6.20
+  resolution: "@types/mongodb@npm:3.6.20"
+  dependencies:
+    "@types/bson": "*"
+    "@types/node": "*"
+  checksum: e5397ada2ed728997f7c3f5424e8c28f682a635488be967c9c18a5de27b1641cf28bb42bc12026ac6d475c457a880e27097e13c8120350ba13219f4ccc030656
   languageName: node
   linkType: hard
 
@@ -1127,6 +1156,17 @@ __metadata:
   version: 2.0.0
   resolution: "aproba@npm:2.0.0"
   checksum: 5615cadcfb45289eea63f8afd064ab656006361020e1735112e346593856f87435e02d8dcc7ff0d11928bc7d425f27bc7c2a84f6c0b35ab0ff659c814c138a24
+  languageName: node
+  linkType: hard
+
+"archetype@npm:0.13.x":
+  version: 0.13.0
+  resolution: "archetype@npm:0.13.0"
+  dependencies:
+    lodash.clonedeep: 4.x
+    lodash.set: 4.x
+    mpath: 0.8.x
+  checksum: ea4010a973070206101f8c57f3324f4b12b41bf81bbf569cab161930b109bf2da3c87148b4931d4be78a87ebf822fd110eca73375d6133c1409543da04fd2123
   languageName: node
   linkType: hard
 
@@ -1841,6 +1881,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"connect-mongodb-session@npm:^3.1.1":
+  version: 3.1.1
+  resolution: "connect-mongodb-session@npm:3.1.1"
+  dependencies:
+    archetype: 0.13.x
+    mongodb: 4.x
+  checksum: 18416bc98f6c2d9296ddf99b2d0eff14bc750240b98ee24af8c9bc5cff063c51e7f6c52d2337d72bd36afa56091d24a792bf5d54c2ee2be34e86b76d8f869523
+  languageName: node
+  linkType: hard
+
 "console-control-strings@npm:^1.0.0, console-control-strings@npm:^1.1.0":
   version: 1.1.0
   resolution: "console-control-strings@npm:1.1.0"
@@ -2320,9 +2370,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.3.723":
-  version: 1.4.12
-  resolution: "electron-to-chromium@npm:1.4.12"
-  checksum: 3a7571e9ca069d19251c11a4ed71953c16ff056c6ae77bc0a841d488c401613c9545189da8394f4da47d7a56ce081c5b78546fa1d1aaa76625a8e490defd8967
+  version: 1.4.13
+  resolution: "electron-to-chromium@npm:1.4.13"
+  checksum: ee45662aff47e0b809cad13bbd9d0e74c00b5b36f3420cda7346dc7be6ff187b4ebae06521b638dfb193ce2fe4408ce4b436ca7711eb793c149dd0d1bf4b0b03
   languageName: node
   linkType: hard
 
@@ -4129,10 +4179,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lodash.clonedeep@npm:4.x":
+  version: 4.5.0
+  resolution: "lodash.clonedeep@npm:4.5.0"
+  checksum: 92c46f094b064e876a23c97f57f81fbffd5d760bf2d8a1c61d85db6d1e488c66b0384c943abee4f6af7debf5ad4e4282e74ff83177c9e63d8ff081a4837c3489
+  languageName: node
+  linkType: hard
+
 "lodash.merge@npm:^4.6.2":
   version: 4.6.2
   resolution: "lodash.merge@npm:4.6.2"
   checksum: ad580b4bdbb7ca1f7abf7e1bce63a9a0b98e370cf40194b03380a46b4ed799c9573029599caebc1b14e3f24b111aef72b96674a56cfa105e0f5ac70546cdc005
+  languageName: node
+  linkType: hard
+
+"lodash.set@npm:4.x":
+  version: 4.3.2
+  resolution: "lodash.set@npm:4.3.2"
+  checksum: a9122f49eef9f2d0fc9061a33d87f8e5b8c6b23d46e8b9e9ce1529d3588d79741bd1145a3abdfa3b13082703e65af27ff18d8a07bfc22b9be32f3fc36f763f70
   languageName: node
   linkType: hard
 
@@ -4457,7 +4521,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mongodb@npm:4.2.1":
+"mongodb@npm:4.2.1, mongodb@npm:4.x":
   version: 4.2.1
   resolution: "mongodb@npm:4.2.1"
   dependencies:
@@ -4489,7 +4553,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mpath@npm:0.8.4":
+"mpath@npm:0.8.4, mpath@npm:0.8.x":
   version: 0.8.4
   resolution: "mpath@npm:0.8.4"
   checksum: 06ad1d443766626fa361b67a4eca9cd4c36a71e475e92e8a5c242dbbc9a911adac00ce971177843b48475356df609f847342548da7701a976a2ab4116135caf0
@@ -5813,14 +5877,17 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "sandbox@workspace:examples/sandbox"
   dependencies:
+    "@koreanwglasses/cascade": 0.1.0
     "@koreanwglasses/commons-nexs-client": "workspace:*"
     "@koreanwglasses/commons-nexs-server": "workspace:*"
     "@koreanwglasses/nexs": 0.0.0-alpha.10
     "@koreanwglasses/nexs-server": 0.0.0-alpha.10
+    "@types/connect-mongodb-session": ^2.4.2
     "@types/express": ^4.17.13
     "@types/express-session": ^1.17.4
     "@types/node": 16.11.10
     "@types/react": 17.0.37
+    connect-mongodb-session: ^3.1.1
     eslint: 7
     eslint-config-next: 12.0.4
     express: ^4.17.1

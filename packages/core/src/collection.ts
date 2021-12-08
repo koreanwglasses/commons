@@ -318,6 +318,13 @@ export class Collection<M extends Model> {
     return new Resource(this, id);
   }
 
+  /**
+   * Alias for this.resource
+   */
+  one(id: string) {
+    return new Resource(this, id);
+  }
+
   query<Name extends keyof Queries<M>>(
     client: Client | Collection<any>,
     name: Name,

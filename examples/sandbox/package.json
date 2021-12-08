@@ -8,12 +8,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@koreanwglasses/cascade": "0.1.0",
     "@koreanwglasses/commons-nexs-client": "workspace:*",
     "@koreanwglasses/commons-nexs-server": "workspace:*",
     "@koreanwglasses/nexs": "0.0.0-alpha.10",
     "@koreanwglasses/nexs-server": "0.0.0-alpha.10",
     "@types/express": "^4.17.13",
     "@types/express-session": "^1.17.4",
+    "connect-mongodb-session": "^3.1.1",
     "express": "^4.17.1",
     "express-async-handler": "^1.2.0",
     "express-session": "^1.17.2",
@@ -24,6 +26,7 @@
     "react-use": "^17.3.1"
   },
   "devDependencies": {
+    "@types/connect-mongodb-session": "^2.4.2",
     "@types/node": "16.11.10",
     "@types/react": "17.0.37",
     "eslint": "7",

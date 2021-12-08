@@ -168,7 +168,9 @@ export class Collection<M extends Model> {
           deps(...handles);
           const item = await (await this.store).findById(id, allowed);
           if (!item) throw NOT_FOUND;
-          return item;
+          return Object.fromEntries(
+            Object.entries(item).filter(([key]) => allowed.includes(key))
+          ) as Partial<Fields<M>>;
         });
       });
 

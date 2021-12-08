@@ -1,6 +1,6 @@
 {
-  "name": "@koreanwglasses/commons-core",
-  "version": "0.1.0",
+  "name": "@koreanwglasses/commons-memory-store-adapter",
+  "version": "0.0.0-alpha.0",
   "packageManager": "yarn@3.1.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,13 +12,13 @@
     "build": "rm -rf dist && tsc"
   },
   "devDependencies": {
-    "@types/node": "^16.11.11",
+    "@types/uuid": "^8.3.3",
     "tsc": "^2.0.3",
     "typescript": "^4.5.2"
   },
   "dependencies": {
-    "@koreanwglasses/cascade": "workspace:^",
-    "@types/deep-equal": "^1.0.1",
-    "deep-equal": "^2.0.5"
+    "@koreanwglasses/commons-core": "workspace:^",
+    "@types/node": "^16.11.11",
+    "uuid": "^8.3.2"
   }
 }

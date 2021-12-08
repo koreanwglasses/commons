@@ -1,5 +1,5 @@
 {
-  "name": "@koreanwglasses/commons-nexs-adapter",
+  "name": "@koreanwglasses/commons-nexs-client",
   "version": "0.0.0-alpha.0",
   "packageManager": "yarn@3.1.1",
   "main": "dist/index.js",
@@ -12,10 +12,17 @@
     "build": "rm -rf dist && tsc"
   },
   "devDependencies": {
+    "@koreanwglasses/commons-core": "workspace:^",
+    "@koreanwglasses/nexs": "0.0.0-alpha.10",
+    "@types/react": "^17.0.37",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
     "tsc": "^2.0.3",
     "typescript": "^4.5.2"
   },
-  "dependencies": {
-    "@koreanwglasses/commons-core": "workspace:^"
+  "peerDependencies": {
+    "@koreanwglasses/nexs": "*",
+    "react": "*",
+    "react-dom": "*"
   }
 }

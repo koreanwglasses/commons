@@ -26,7 +26,7 @@
     "typescript": "^4.5.2"
   },
   "dependencies": {
-    "@koreanwglasses/cascade": "workspace:^",
+    "@koreanwglasses/cascade": "0.1.0",
     "@koreanwglasses/commons-core": "workspace:^",
     "express": "^4.17.1",
     "express-async-handler": "^1.2.0",

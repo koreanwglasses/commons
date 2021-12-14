@@ -316,7 +316,7 @@ export class Commons {
 
         const params =
           method === "GET"
-            ? JSON.stringify(req.query.params ?? "[]")
+            ? JSON.parse(req.query.params as string ?? "[]")
             : req.body.params ?? [];
 
         const result = this.resolve(

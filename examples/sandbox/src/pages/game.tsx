@@ -19,7 +19,7 @@ const GameContext = createContext<{
 const Loader = () => {
   const router = useRouter();
 
-  const state = useQuery<ClientState>("/api/session/state");
+  const state = useQuery<ClientState>("/api/app/state");
 
   return (
     <Layout>

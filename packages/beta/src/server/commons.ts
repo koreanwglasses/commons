@@ -14,10 +14,14 @@ import { Server, Namespace } from "socket.io";
 import { v4 as uuid } from "uuid";
 import hash from "object-hash";
 import jsonpatch from "fast-json-patch";
+import { customRandom, nanoid, urlAlphabet } from "nanoid";
+import seedrandom from "seedrandom";
 
 const debug = (...args: any) => {
   if (process.env.NODE_ENV === "development") console.log(...args);
 };
+
+type Packed = { result: unknown; refs: Record<string, any> };
 
 export class Commons {
   private io: Namespace;
@@ -47,7 +51,7 @@ export class Commons {
     client: Client,
     value: unknown,
     refs: Record<string, any> = {}
-  ): Cascade<{ result: unknown; refs: Record<string, any> }> {
+  ): Cascade<Packed> {
     return Cascade.$({ value }).$(({ value }) => {
       if (value instanceof Resource) {
         if (value.id in refs)
@@ -127,6 +131,51 @@ export class Commons {
     });
   }
 
+  private shortenRefs(packed: Packed) {
+    const length = 4;
+    /**
+     * Generates reasonably stable, cryptographically UNsafe hashes to shorten
+     * ref ids
+     */
+    const shorten = (string: string, exclude: Set<string> = new Set()) => {
+      const rng = seedrandom(string);
+      const hasher = customRandom(urlAlphabet, length, (n) => {
+        return new Uint8Array(n).map(() => 256 * rng());
+      });
+      let result: string;
+      while (exclude.has((result = hasher())));
+      return result;
+    };
+
+    const newKeys = new Set<string>(Object.keys(packed.refs));
+    const refsRemap = {} as Record<string, string>;
+
+    Object.keys(packed.refs).forEach((key) =>
+      newKeys.add((refsRemap[key] = shorten(key, newKeys)))
+    );
+
+    Object.entries(refsRemap).forEach(([key, newKey]) => {
+      packed.refs[newKey] = packed.refs[key];
+      delete packed.refs[key];
+    });
+
+    const recursiveReplace = (value: unknown) => {
+      if (!value || typeof value !== "object") return value;
+      for (const key in value) {
+        if (key === "__commons_ref") {
+          (value as any)[key] = refsRemap[(value as any)[key]];
+        } else {
+          recursiveReplace((value as any)[key]);
+        }
+      }
+    };
+
+    recursiveReplace(packed);
+
+    // Do json-round trip so it can be diffed properly
+    return JSON.parse(JSON.stringify(packed));
+  }
+
   /**
    * Resolves nested routes ot the appropriate data endpoint
    */
@@ -136,7 +185,7 @@ export class Commons {
     base: Collection<any> | Resource<any> | Record<string | number, any>,
     path: string[] = [],
     ...params: any
-  ): Cascade<unknown> {
+  ): Cascade<Packed> {
     if (base instanceof Collection) {
       debug(`> resolving ${base.model.name}:${path.join("/")}`);
     } else if (base instanceof Resource) {
@@ -200,7 +249,7 @@ export class Commons {
   }
 
   serve(collection: Collection<Model>) {
-    const pipeToSocket = (req: Request, cascade: Cascade) => {
+    const pipeToSocket = (req: Request, cascade: Cascade<Packed>) => {
       const socketId = req.query.__commons_socket_id;
       if (typeof socketId !== "string") throw BAD_REQUEST("Invalid socket id");
 
@@ -217,6 +266,7 @@ export class Commons {
       });
 
       const pipe = cascade
+        .p(this.shortenRefs)
         .p((value) => {
           const diff = jsonpatch.compare(last, { result: value });
           last.result = value;

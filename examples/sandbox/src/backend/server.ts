@@ -2,7 +2,6 @@ import { connect } from "./database";
 import MongoDBStoreFactory from "connect-mongodb-session";
 import { uri } from "./database";
 import { Rooms } from "../resources/room";
-import { Sessions } from "../resources/session";
 import next from "next";
 import express from "express";
 import { Commons } from "@koreanwglasses/commons-beta/server";
@@ -10,6 +9,7 @@ import expressSession from "express-session";
 import { Users } from "../resources/user";
 import iosession from "express-socket.io-session";
 import { Server as IO } from "socket.io";
+import { App } from "../resources/app";
 
 const nextApp = next({ dev: process.env.NODE_ENV === "development" });
 const handler = nextApp.getRequestHandler();
@@ -52,14 +52,14 @@ const commons = new Commons({
   },
 });
 
-app.use("/api/session", commons.serve(Sessions));
+app.use("/api/app", commons.serve(App));
 app.use("/api/room", commons.serve(Rooms));
 
 (async () => {
   await nextApp.prepare();
   await connect();
 
-  app.all(/\/(?!api\/(session|room)).*/, (req, res) => {
+  app.all(/\/(?!api\/(app|room)).*/, (req, res) => {
     if (!(req.path.startsWith("/_next/") || req.path.startsWith("/__nextjs")))
       console.log("next", req.path);
     return handler(req, res);

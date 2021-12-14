@@ -40,7 +40,7 @@ const IndexContext = createContext<{
 } | null>(null);
 
 const Loader = () => {
-  const state = useQuery<ClientState>("/api/session/state");
+  const state = useQuery<ClientState>("/api/app/state");
 
   const router = useRouter();
   useEffect(() => {

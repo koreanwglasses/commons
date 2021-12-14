@@ -135,7 +135,7 @@ export default function commons({
       .$(($) => {
         const packed = new Managed();
         socket.on(`cascade:${$.dataKey}:diff`, (diff, expectedHash) => {
-          // apply patchon copy of last so cascades can
+          // apply patch on copy of last so cascades can
           // properly detect/propagate the change
           const next = JSON.parse(JSON.stringify(last));
           jsonpatch.applyPatch(next, diff);
@@ -143,18 +143,21 @@ export default function commons({
 
           const actualHash = hash(value);
           if (expectedHash !== actualHash) {
+            console.debug(
+              `Hash mismatch (expected: ${expectedHash}, got: ${actualHash}). Requesting server for un-diffed data.`
+            );
             socket.emit(`cascade:${$.dataKey}:resend`);
           } else {
+            last.result = value;
             packed.value(
               value,
               true /* needed since value was modified in-place */
             );
-            last.result = value;
           }
         });
         socket.on(`cascade:${$.dataKey}:value`, (value) => {
-          packed.value(value);
           last.result = value;
+          packed.value(value);
         });
         socket.on(`cascade:${$.dataKey}:error`, (error) => {
           packed.error(error);
@@ -167,6 +170,9 @@ export default function commons({
           socket.off(`cascade:${$.dataKey}:error`);
         });
         return $({ packed });
+      })
+      .$(($) => {
+        console.debug(`Packed response (${path}):`, $.packed);
       })
       .$(($) => ({ ...$.packed, path } as Packed));
   };

@@ -48,14 +48,65 @@ export default function commons({
 } = {}) {
   const socket = _socket ?? io("/commons.io");
 
-  socket.onAny((event: string, data) => {
+  // Setup listeners for streamed data
+  const cascades = {} as Record<string, Managed>;
+  const getCascade = (dataKey: string) => {
+    if (!cascades[dataKey]) {
+      cascades[dataKey] = new Managed();
+      cascades[dataKey].onClose(() => {
+        console.debug(`Closing ${dataKey}`);
+
+        socket.emit(`cascade:${dataKey}:close`);
+        socket.off(`cascade:${dataKey}:value`);
+        socket.off(`cascade:${dataKey}:error`);
+
+        delete cascades[dataKey];
+        delete diffBase[dataKey];
+      });
+    }
+    return cascades[dataKey];
+  };
+  const diffBase = {} as Record<string, { result: Packed }>;
+  socket.onAny((event: string, data, expectedHash) => {
     if (event.startsWith("cascade:") && event.endsWith(":diff")) {
       console.debug(`Received diff of size ${JSON.stringify(data).length}`);
+    }
+
+    const [, dataKey, method] =
+      /^cascade:(.*):(diff|value|error)$/.exec(event) ?? [];
+
+    if (dataKey && method) {
+      const cascade = getCascade(dataKey);
+      if (method === "error") cascade.error(data);
+      if (method === "value") {
+        cascade.value(data);
+        diffBase[dataKey].result = data;
+      }
+      if (method === "diff") {
+        // do json round trip so jsonpatch can work properly
+        const next = JSON.parse(
+          JSON.stringify((diffBase[dataKey] ??= { result: undefined as any }))
+        );
+        jsonpatch.applyPatch(next, data);
+        const value = next.result;
+
+        const actualHash = hash(value);
+        if (expectedHash !== actualHash) {
+          console.debug(
+            `Hash mismatch (expected: ${expectedHash}, got: ${actualHash}). Requesting server for un-diffed data.`
+          );
+          socket.emit(`cascade:${dataKey}:resend`);
+        } else {
+          diffBase[dataKey].result = value;
+          cascade.value(value);
+        }
+      }
     }
   });
 
   const connect = new Promise<void>((res) => socket.once("connect", res));
 
+  // Define exported functions
   const unpack = (packed: Packed) => {
     let prefix = packed.path.endsWith("/")
       ? packed.path.slice(0, -1)
@@ -114,7 +165,6 @@ export default function commons({
   const query = (path: string, ...params: any) => {
     console.debug("Sending request to", path);
 
-    const last: { result: any } = { result: undefined };
     return Cascade.$({ connect })
       .$(($) => {
         let url = path;
@@ -133,48 +183,19 @@ export default function commons({
         return $({ dataKey: $.response.text(), response: null });
       })
       .$(($) => {
-        const packed = new Managed();
-        socket.on(`cascade:${$.dataKey}:diff`, (diff, expectedHash) => {
-          // apply patch on copy of last so cascades can
-          // properly detect/propagate the change
-          const next = JSON.parse(JSON.stringify(last));
-          jsonpatch.applyPatch(next, diff);
-          const value = next.result;
-
-          const actualHash = hash(value);
-          if (expectedHash !== actualHash) {
-            console.debug(
-              `Hash mismatch (expected: ${expectedHash}, got: ${actualHash}). Requesting server for un-diffed data.`
-            );
-            socket.emit(`cascade:${$.dataKey}:resend`);
-          } else {
-            last.result = value;
-            packed.value(
-              value,
-              true /* needed since value was modified in-place */
-            );
-          }
-        });
-        socket.on(`cascade:${$.dataKey}:value`, (value) => {
-          last.result = value;
-          packed.value(value);
-        });
-        socket.on(`cascade:${$.dataKey}:error`, (error) => {
-          packed.error(error);
-        });
-        packed.onClose(() => {
-          console.debug(`Closing ${$.dataKey}`);
-
-          socket.emit(`cascade:${$.dataKey}:close`);
-          socket.off(`cascade:${$.dataKey}:value`);
-          socket.off(`cascade:${$.dataKey}:error`);
-        });
-        return $({ packed });
+        return $({ packed: getCascade($.dataKey) });
       })
       .$(($) => {
         console.debug(`Packed response (${path}):`, $.packed);
       })
       .$(($) => ({ ...$.packed, path } as Packed));
+  };
+
+  const queryOnce = async <T = any>(
+    path: string,
+    ...params: any
+  ): Promise<Unpacked<T>> => {
+    return unpack(await query(path, ...params).next());
   };
 
   const action = async <T = any>(path: string, ...params: any): Promise<T> => {
@@ -198,7 +219,7 @@ export default function commons({
     }
   };
 
-  return { query, action, unpack };
+  return { query, queryOnce, action, unpack };
 }
 
 export type CommonsClient = ReturnType<typeof commons>;

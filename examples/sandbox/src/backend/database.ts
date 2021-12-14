@@ -1,6 +1,5 @@
-import { Database, Fields, Model, Store } from "@koreanwglasses/commons-core";
+import { Supplier, Fields, Model, Store } from "@koreanwglasses/commons-core";
 import mongoose from "mongoose";
-// mongoose.set("debug", true);
 
 export const store = <M extends Model>(model: M, includeId=false): mongoose.Model<Fields<M>> => {
   if (mongoose.models[model.name]) return mongoose.models[model.name];
@@ -31,7 +30,7 @@ const adapter = <M extends Model>(
   };
 };
 
-export const MongoDatabase = new Database({
+export const MongoSupplier = new Supplier({
   createStore(model) {
     return adapter(store(model));
   },

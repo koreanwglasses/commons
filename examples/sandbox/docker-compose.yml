@@ -1,12 +1,14 @@
 services:
   app:
-    image: node:17
+    build: 
+      context: ../../
+      dockerfile: ./examples/sandbox/Dockerfile
     command: sh -c "yarn set version berry && yarn && yarn dev"
     ports:
-      - 3000:3000
+      - 5000:3000
     working_dir: /commons/examples/sandbox
     volumes:
-      - ../../:/commons
+      - ./:/commons/examples/sandbox
     environment:
       DB_HOST: mongo
       DB_PORT: 27017
@@ -23,16 +25,20 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: secret
       MONGO_INITDB_DATABASE: app
+    logging:
+      driver: "none"
 
   mongo-express:
     image: mongo-express
     restart: always
     ports:
-      - 8081:8081
+      - 8082:8081
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: root
       ME_CONFIG_MONGODB_ADMINPASSWORD: secret
       ME_CONFIG_MONGODB_URL: mongodb://root:secret@mongo:27017/
+    logging:
+      driver: "none"
 
 volumes:
   data:

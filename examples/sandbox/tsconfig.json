@@ -14,7 +14,8 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "typeRoots": ["src/types"]
+    "typeRoots": ["src/types"],
+    "downlevelIteration": true
   },
   "ts-node": {
     "compilerOptions": {

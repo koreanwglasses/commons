@@ -1,0 +1,7 @@
+{
+  "extends": "@koreanwglasses/commons-core",
+  "compilerOptions": {
+    "outDir": "dist/node",
+    "jsx": "react"
+  }
+}

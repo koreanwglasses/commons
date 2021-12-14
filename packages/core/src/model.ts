@@ -1,5 +1,5 @@
 import { Cascade, Volatile } from "@koreanwglasses/cascade";
-import { Collection, Resource, Policy, ResourcePolicy, Client } from ".";
+import { Collection, Resource, StaticPolicy, Policy, Client } from ".";
 import {
   FuncRecord,
   Result,
@@ -32,27 +32,25 @@ export interface Field<M extends Model, T> {
  * difference between the two is that actions declare effects
  * while queries declare dependencies
  */
+
 export type Query<M extends Model, Params extends unknown[], T> =
   | {
       policy?: Policy<M, Params>;
-      requireTarget?: false;
-      /**
-       * Include this query in a fetch. False by default
-       */
-      fetch?: boolean;
+      isStatic?: false;
+      autoFetch?: boolean;
       get(
         this: Collection<M>,
-        request: { target: Resource<M> | null; client: Client },
+        request: { target: Resource<M>; client: Client },
         ...params: Params
       ): QueryResult<T>;
     }
   | {
-      policy?: ResourcePolicy<M, Params>;
-      requireTarget: true;
-      fetch?: boolean;
+      policy?: StaticPolicy<M, Params>;
+      isStatic: true;
+      autoFetch?: boolean;
       get(
         this: Collection<M>,
-        request: { target: Resource<M>; client: Client },
+        request: { client: Client },
         ...params: Params
       ): QueryResult<T>;
     };
@@ -75,19 +73,19 @@ export type QueryResult<T> =
 export type Action<M extends Model, Params extends unknown[], T> =
   | {
       policy?: Policy<M, Params>;
-      requireTarget?: false;
+      isStatic?: false;
       exec(
         this: Collection<M>,
-        request: { target: Resource<M> | null; client: Client },
+        request: { target: Resource<M>; client: Client },
         ...params: Params
       ): Whenever<ActionResult<T>>;
     }
   | {
-      policy?: ResourcePolicy<M, Params>;
-      requireTarget: true;
+      policy?: StaticPolicy<M, Params>;
+      isStatic: true;
       exec(
         this: Collection<M>,
-        request: { target: Resource<M>; client: Client },
+        request: { client: Client },
         ...params: Params
       ): Whenever<ActionResult<T>>;
     };

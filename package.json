@@ -2,7 +2,6 @@
   "packageManager": "yarn@3.1.1",
   "workspaces": [
     "examples/*",
-    "packages/*",
-    "packages/adapters/*"
+    "packages/*"
   ]
 }

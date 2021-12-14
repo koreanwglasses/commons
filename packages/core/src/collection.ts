@@ -3,24 +3,24 @@ import {
   Actions,
   Model,
   Fields,
-  Policy,
+  StaticPolicy,
   Client,
   Queries,
   ACCESS_NEVER,
   ACCESS_DENY,
   AccessType,
-  ResourcePolicy,
-  ACCESS_ALLOW,
+  Policy,
+  ALLOW_NONE,
+  ALLOW_ALL,
+  NOT_FOUND,
+  FORBIDDEN,
 } from ".";
-import { Store } from "./database";
+import { Store } from "./supplier";
 import { Whenever } from "./types";
 
-export const FORBIDDEN = 403;
-export const NOT_FOUND = 404;
-
 const throwPolicy = (access: AccessType) => {
-  if (access === ACCESS_NEVER) throw NOT_FOUND;
-  if (access === ACCESS_DENY) throw FORBIDDEN;
+  if (access === ACCESS_NEVER) throw NOT_FOUND();
+  if (access === ACCESS_DENY) throw FORBIDDEN();
 };
 
 export type HandleName<M> =
@@ -33,7 +33,7 @@ export type HandleName<M> =
 
 export class Collection<M extends Model> {
   /** @internal */
-  _handles: Record<any, Volatile> = {};
+  _handles: Record<any, Cascade> = {};
 
   /** @internal */
   _handle(key: string) {
@@ -56,53 +56,82 @@ export class Collection<M extends Model> {
     const handle = this._existenceHandle(id);
     return handle.p(async () => {
       const item = await (await this.store).findById(id, []);
-      if (!item) throw NOT_FOUND;
+      if (!item) throw NOT_FOUND();
     });
   }
 
   /** @internal */
-  _checkCollectionPolicy(
+  _checkResourcePolicy(
     client: Client | Collection<any>,
-    id: string | null
-  ): Cascade<Resource<M> | null> {
-    return Cascade.flatten(
-      id ? this._checkExistence(id).p(() => this.resource(id)) : null
-    ).j(async (target) =>
-      client instanceof Collection
-        ? Cascade.const(target) // Skip policy check if internal
-        : Cascade.flatten(
-            (await this.model.policy?.call(this, target, client)) ??
-              ACCESS_ALLOW
-          )
-            .p(throwPolicy)
-            .p(() => target)
-    );
+    id: string
+  ): Cascade<Resource<M>> {
+    const { policy = ALLOW_ALL } = this.model;
+    const target = this._checkExistence(id).p(() => this.resource(id));
+
+    if (client instanceof Collection) {
+      // Skip policy check if client is internal
+      return Cascade.flatten(target);
+    }
+
+    return Cascade.$({ target })
+      .$(($) =>
+        $({
+          accessType: policy.apply(this, [$.target, client] as any),
+        })
+      )
+      .$(($) => throwPolicy($.accessType))
+      .$(($) => $.target);
   }
 
   /** @internal */
   _checkPolicies(
-    policy: Policy<M> | ResourcePolicy<M> | undefined,
+    policy: Policy<M> | StaticPolicy<M> | undefined = ALLOW_NONE,
     client: Client | Collection<any>,
     id: string | null,
     params: unknown[] = []
-  ): Cascade<Resource<M> | null> {
-    return this._checkCollectionPolicy(client, id).j(async (target) =>
-      client instanceof Collection
-        ? Cascade.const(target) // Skip policy check if internal
-        : Cascade.flatten(
-            (await policy?.apply(this, [target, client, ...params] as any)) ??
-              ACCESS_NEVER
-          )
-            .p(throwPolicy)
-            .p(() => target)
-    );
+  ): Cascade<Resource<M> | void> {
+    if (!id) {
+      /* STATIC */
+      if (client instanceof Collection) {
+        // Skip policy check if client is internal
+        return new Cascade(() => {});
+      }
+
+      return Cascade.flatten(
+        (policy as StaticPolicy<M>).apply(this, [
+          null,
+          client,
+          ...params,
+        ] as any)
+      ).p(throwPolicy);
+    }
+
+    const target = this._checkResourcePolicy(client, id!);
+
+    if (client instanceof Collection) {
+      // Skip policy check if client is internal
+      return target;
+    }
+
+    return Cascade.$({ target })
+      .$(($) =>
+        $({
+          accessType: (policy as Policy<M>).apply(this, [
+            $.target,
+            client,
+            ...params,
+          ] as any),
+        })
+      )
+      .$(($) => throwPolicy($.accessType))
+      .$(($) => $.target);
   }
 
   /** @internal */
   _allowedKeys(
     client: Client,
     id: string | null,
-    map: Record<string, { policy?: Policy<M> | ResourcePolicy<M> }>
+    map: Record<string, { policy?: Policy<M> | StaticPolicy<M> }>
   ): Cascade<string[]> {
     return Cascade.all(
       Object.entries(map).map(([name, aspect]) =>
@@ -131,18 +160,18 @@ export class Collection<M extends Model> {
 
     const handle = this._fieldHandle(id, name);
 
-    return this._checkPolicies(field.policy, client, id).j(() =>
-      handle.p(
-        async () => (await (await this.store).findById(id, [name]))?.[name]
-      )
-    );
+    return this._checkPolicies(field.policy, client, id)
+      .$(async (_, deps) => {
+        deps(handle);
+        return (await this.store).findById(id, [name]);
+      })
+      .$((record) => (record as Partial<Fields<M>> | null)?.[name]);
   }
 
   /** @internal */
   _fetch(
     client: Client | Collection<any>,
-    id: string,
-    includeQueries = false
+    id: string
   ): Cascade<
     Partial<Fields<M>> &
       Partial<{ [K in keyof Queries<M>]: ReturnType<Queries<M>[K]> }>
@@ -153,49 +182,94 @@ export class Collection<M extends Model> {
       Object.entries(fields ?? {}).filter(([_, v]) => v.fetch ?? true)
     );
 
-    const queriesToFetch = includeQueries
-      ? Object.fromEntries(
-          Object.entries(queries ?? {}).filter(([_, v]) => v.fetch ?? false)
-        )
-      : {};
+    const queriesToFetch = Object.fromEntries(
+      Object.entries(queries ?? {}).filter(
+        ([_, v]) => !v.isStatic && (v.autoFetch ?? false)
+      )
+    );
 
-    return this._checkCollectionPolicy(client, id).j(() => {
-      const base = this._allowedKeys(client, id, fieldsToFetch).j((allowed) => {
-        const handles = allowed.map((name) =>
-          this._fieldHandle(id, name as keyof Fields<M>)
-        );
-        return new Cascade(async (_, deps) => {
-          deps(...handles);
-          const item = await (await this.store).findById(id, allowed);
-          if (!item) throw NOT_FOUND;
-          return Object.fromEntries(
-            Object.entries(item).filter(([key]) => allowed.includes(key))
-          ) as Partial<Fields<M>>;
+    return Cascade.$(() => {
+      this._checkResourcePolicy(client, id);
+    })
+      .$({
+        store: this.store,
+        allowed: this._allowedKeys(client, id, fieldsToFetch),
+      })
+      .$(($) =>
+        $({ handles: $.allowed.map((name) => this._fieldHandle(id, name)) })
+      )
+      .$(($, deps) => {
+        deps(...$.handles);
+        return $({
+          item: $.store.findById(id, $.allowed),
+          store: null,
+          handles: null,
         });
-      });
+      })
+      .$(($) => {
+        if (!$.item) throw NOT_FOUND();
+        return $({
+          fieldResults: Object.fromEntries(
+            Object.entries($.item as Partial<Fields<M>>).filter(([key]) =>
+              $.allowed.includes(key)
+            )
+          ),
+          item: null,
+          allowed: null,
+        });
+      })
+      .$({
+        queryEntries: Cascade.all(
+          Object.keys(queriesToFetch).map((name) =>
+            this._query(client, id, name, ...([] as any))
+              .p((result) => [name, result] as const)
+              .catch(() => undefined)
+          )
+        ),
+      })
+      .$(($) =>
+        $({
+          queryResults: Object.fromEntries(
+            $.queryEntries.filter((entry) => entry) as [
+              string,
+              ReturnType<Queries<M>[string]>
+            ][]
+          ),
+          queryEntries: null,
+        })
+      )
+      .p(($) => ({
+        ...($.fieldResults as Partial<Fields<M>>),
+        ...$.queryResults,
+      }));
+  }
 
-      const queryResults = Cascade.all(
+  /** @internal */
+  _fetchStatic(
+    client: Client | Collection<any>
+  ): Cascade<Partial<{ [K in keyof Queries<M>]: ReturnType<Queries<M>[K]> }>> {
+    const { queries } = this.model;
+
+    const queriesToFetch = Object.fromEntries(
+      Object.entries(queries ?? {}).filter(
+        ([_, v]) => v.isStatic && (v.autoFetch ?? false)
+      )
+    );
+
+    return Cascade.$({
+      queryEntries: Cascade.all(
         Object.keys(queriesToFetch).map((name) =>
-          this._query(client, id, name, ...([] as any))
+          this._query(client, null, name, ...([] as any))
             .p((result) => [name, result] as const)
             .catch(() => undefined)
         )
-      ).p((entries) =>
+      ),
+    }).p(
+      ($) =>
         Object.fromEntries(
-          entries.filter((entry) => entry) as [
-            string,
-            ReturnType<Queries<M>[string]>
-          ][]
-        )
-      );
-
-      return Cascade.all([base, queryResults] as const).p(
-        ([base, queryResults]) => ({
-          ...base,
-          ...queryResults,
-        })
-      );
-    });
+          $.queryEntries.filter((entry) => entry) as any
+        ) as any
+    );
   }
 
   /** @internal */
@@ -213,42 +287,47 @@ export class Collection<M extends Model> {
     const { queries } = this.model;
     const query = queries?.[name];
 
-    if (!query || (query.requireTarget && !id)) return Cascade.error(NOT_FOUND);
+    if (!query || (!query.isStatic && !id))
+      return Cascade.error(
+        NOT_FOUND(
+          `${
+            client instanceof Collection
+              ? `(Caller: ${client.model.name}) `
+              : ""
+          }Cannot get non-static query without specifying an id`
+        )
+      );
 
     const handle = this._queryHandle(id, name);
 
-    return this._checkPolicies(query.policy, client, id, params).j((target) =>
-      handle
-        .p(async (_, deps) => {
-          const result = await query!.get.call(
-            this,
-            { target: target!, client },
-            ...params
-          );
-
-          if (
-            result &&
-            typeof result === "object" &&
-            Array.isArray(result.deps) &&
-            "value" in result
-          ) {
-            /* Validate the return from the query call */
-            const keys = Object.keys(result);
-            if (keys.length > 2) {
-              console.warn(
-                "Query returned an object with a `value` field and a `deps` array but also contains other fields. This potentially indicates a bug. Check the ActionResult type for reference."
-              );
-            }
-
-            /* Set dependencies and return value */
-            deps(...(result.deps ?? []));
-            return result.value;
-          } else {
-            return result;
+    return this._checkPolicies(query.policy, client, id, params)
+      .p((target, deps) => {
+        deps(handle);
+        return query.get.call(this, { target: target!, client }, ...params);
+      })
+      .p((result, deps) => {
+        if (
+          result &&
+          typeof result === "object" &&
+          Array.isArray(result.deps) &&
+          "value" in result
+        ) {
+          /* Validate the return from the query call */
+          const keys = Object.keys(result);
+          if (keys.length > 2) {
+            console.warn(
+              "Query returned an object with a `value` field and a `deps` array but also contains other fields. This potentially indicates a bug. Check the ActionResult type for reference."
+            );
           }
-        })
-        .flat()
-    );
+
+          /* Set dependencies and return value */
+          deps(...(result.deps ?? []));
+          return result.value;
+        } else {
+          return result;
+        }
+      })
+      .flat();
   }
 
   /** @internal */
@@ -261,7 +340,12 @@ export class Collection<M extends Model> {
     const { actions } = this.model;
     const action = actions?.[name];
 
-    if (!action || (action.requireTarget && !id)) throw NOT_FOUND;
+    if (!action || (!action.isStatic && !id))
+      throw NOT_FOUND(
+        `${
+          client instanceof Collection ? `(Caller: ${client.model.name}) ` : ""
+        }Cannot execute non-static action without specifying an id`
+      );
 
     const target = await this._checkPolicies(
       action.policy,
@@ -294,34 +378,24 @@ export class Collection<M extends Model> {
   }
 
   /** @internal */
-  _list(client: Client | Collection<any>, id: string) {
-    const { fields = {}, queries = {}, actions = {} } = this.model;
+  _list(
+    client: Client | Collection<any>,
+    id: string | null
+  ): Cascade<(keyof Actions<M> & string)[]> {
+    const { actions = {} } = this.model;
 
-    const allowedFields = this._allowedKeys(client, id, fields).p((names) =>
-      names.map((name) => `.${name}`)
-    );
-    const allowedQueries = this._allowedKeys(client, id, queries).p((names) =>
-      names.map((name) => `/${name}?`)
-    );
-    const allowedActions = this._allowedKeys(client, id, actions).p((names) =>
+    return this._allowedKeys(client, id, actions).p((names) =>
       names.map((name) => `/${name}`)
-    );
-
-    return Cascade.all([allowedFields, allowedActions, allowedQueries]).p(
-      (names) => names.flat()
     );
   }
 
   constructor(readonly model: M, private store: Whenever<Store<M>>) {}
 
-  resource(id: string) {
-    return new Resource(this, id);
+  fetch(client: Client | Collection<any>) {
+    return this._fetchStatic(client);
   }
 
-  /**
-   * Alias for this.resource
-   */
-  one(id: string) {
+  resource(id: string) {
     return new Resource(this, id);
   }
 
@@ -341,9 +415,49 @@ export class Collection<M extends Model> {
     return this._action(client, null, name, ...params);
   }
 
+  list(client: Client | Collection<any>) {
+    return this._list(client, null);
+  }
+
   handle(...ids: `${string}:${NonNullable<HandleName<M>> | ""}`[]) {
     return ids.map((name) => this._handle(name));
   }
+
+  //////////////////////////
+  // ALIASES & SHORTHANDS //
+  //////////////////////////
+
+  /**
+   * Shorthand for this.resource
+   *
+   * this.$[id] === this.resource(id)
+   */
+  readonly $ = new Proxy(
+    {},
+    {
+      get: (_, prop) => {
+        if (typeof prop === "string") {
+          return this.resource(prop);
+        }
+      },
+    }
+  ) as { [id: string]: Resource<M> };
+
+  readonly queries = shorthandProxy(
+    this,
+    this.model.queries,
+    (client, name, ...params) => this.query(client, name, ...params)
+  ) as QueryShorthands<M>;
+
+  readonly q = this.queries;
+
+  readonly actions = shorthandProxy(
+    this,
+    this.model.actions,
+    (client, name, ...params) => this.action(client, name, ...params)
+  ) as ActionShorthands<M>;
+
+  readonly a = this.actions;
 }
 
 export class Resource<M extends Model> {
@@ -353,8 +467,8 @@ export class Resource<M extends Model> {
    * Gets all available fields (except those with fetch=false), and queries with
    * fetch=true.
    */
-  fetch(client: Client, includeQueries?: boolean) {
-    return this.collection._fetch(client, this.id, includeQueries);
+  fetch(client: Client) {
+    return this.collection._fetch(client, this.id);
   }
 
   field<Name extends keyof Fields<M> & string>(
@@ -380,7 +494,105 @@ export class Resource<M extends Model> {
     return this.collection._action(client, this.id, name, ...params);
   }
 
+  list(client: Client | Collection<any>) {
+    return this.collection._list(client, this.id);
+  }
+
   handle(...ids: HandleName<M>[]) {
     return ids.map((name) => this.collection._handle(`${this.id}:${name}`));
   }
+
+  //////////////////////////
+  // ALIASES & SHORTHANDS //
+  //////////////////////////
+
+  /**
+   * Shorthand for this.field
+   *
+   * this.$[name] === this.field(this.collection, name)
+   * this.$[name].as(client) === this.field(client, name)
+   */
+  readonly $ = new Proxy(this.collection.model.fields ?? {}, {
+    get: (target, prop, receiver) => {
+      if (
+        (typeof prop === "string" || typeof prop === "number") &&
+        prop in target
+      ) {
+        return Object.assign(this.field(this.collection, prop), {
+          as: (client: Client | Collection<any>) => this.field(client, prop),
+        });
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as unknown as FieldShorthands<M>;
+
+  readonly queries = shorthandProxy(
+    this.collection,
+    this.collection.model.queries,
+    (client, name, ...params) => this.query(client, name, ...params)
+  ) as QueryShorthands<M>;
+
+  readonly q = this.queries;
+
+  readonly actions = shorthandProxy(
+    this.collection,
+    this.collection.model.actions,
+    (client, name, ...params) => this.action(client, name, ...params)
+  ) as ActionShorthands<M>;
+
+  readonly a = this.actions;
 }
+
+///////////////
+// SHORTHAND //
+///////////////
+
+const shorthandProxy = (
+  collection: Collection<any>,
+  record: Record<string, unknown> | undefined,
+  func: (client: Client | Collection<any>, name: string, ...params: any) => any
+) =>
+  new Proxy(record ?? {}, {
+    get: (target, prop, receiver) => {
+      if (typeof prop === "string" && prop in target) {
+        return Object.assign(
+          function (...params: any) {
+            return func(collection, prop, ...params);
+          },
+          {
+            as: (client: Client | Collection<any>, ...params: any) =>
+              func(client, prop, ...params),
+          }
+        );
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+type FieldShorthands<M extends Model> = {
+  [K in keyof Fields<M>]: Cascade<Fields<M>[K]> & {
+    as(client: Client | Collection<any>): Fields<M>[K];
+  };
+};
+
+type QueryShorthands<M extends Model> = {
+  [K in keyof Queries<M>]: ((
+    ...params: Parameters<Queries<M>[K]>
+  ) => Cascade<ReturnType<Queries<M>[K]>>) & {
+    as(
+      client: Client | Collection<any>,
+      ...params: Parameters<Queries<M>[K]>
+    ): Cascade<ReturnType<Queries<M>[K]>>;
+  };
+};
+
+type ActionShorthands<M extends Model> = {
+  [K in keyof Actions<M>]: ((
+    ...params: Parameters<Actions<M>[K]>
+  ) => Promise<ReturnType<Actions<M>[K]>>) & {
+    as(
+      client: Client | Collection<any>,
+      ...params: Parameters<Actions<M>[K]>
+    ): Promise<ReturnType<Actions<M>[K]>>;
+  };
+};

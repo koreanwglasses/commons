@@ -34,14 +34,14 @@ export type AccessType =
   | typeof ACCESS_DENY
   | typeof ACCESS_ALLOW;
 
-export type Policy<M extends Model, Params extends unknown[] = []> = (
+export type StaticPolicy<M extends Model, Params extends unknown[] = []> = (
   this: Collection<M>,
-  target: Resource<M> | null,
+  target: null,
   client: Client,
   ...params: Params
 ) => Result<AccessType>;
 
-export type ResourcePolicy<M extends Model, Params extends unknown[] = []> = (
+export type Policy<M extends Model, Params extends unknown[] = []> = (
   this: Collection<M>,
   target: Resource<M>,
   client: Client,

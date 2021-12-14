@@ -1,10 +1,15 @@
+import { Cascade, DEFER_RESULT } from "@koreanwglasses/cascade";
 import {
+  ALLOW_ALL,
   Client,
   Collection,
   Model,
   Resource,
 } from "@koreanwglasses/commons-core";
-import { MongoDatabase, store } from "../backend/database";
+import { MongoSupplier, store } from "../backend/database";
+import { Game, Games } from "./game";
+import { Room, Rooms } from "./room";
+import { User, Users, UserStore } from "./user";
 
 declare module "@koreanwglasses/commons-core" {
   interface Client {
@@ -16,27 +21,37 @@ declare module "@koreanwglasses/commons-core" {
 // TYPE DECLARATIONS //
 ///////////////////////
 
-export type Session = Resource<typeof model>;
-export type Sessions = Collection<typeof model>;
+export type Session = Resource<SessionModel>;
+export type Sessions = Collection<SessionModel>;
 
-interface SessionFields {
+export type ClientState = { user: User; room: Room | null; game: Game | null };
+
+type Fields = {
   _id: string;
   session: {
     userId: string;
   };
-}
+};
+
+type Queries = {
+  state(): ClientState;
+};
+
+type Actions = {
+  _update(data: Partial<Fields["session"]>): void;
+};
+
+type SessionModel = Model<Fields, Queries, Actions>;
+
+//////////////
+// POLICIES //
+//////////////
 
 //////////////////////
 // MODEL DEFINITION //
 //////////////////////
 
-const model: Model<
-  SessionFields,
-  {},
-  {
-    update(data: Partial<SessionFields["session"]>): void;
-  }
-> = {
+const model: SessionModel = {
   name: "Session",
 
   fields: {
@@ -50,9 +65,41 @@ const model: Model<
     },
   },
 
+  queries: {
+    state: {
+      policy: ALLOW_ALL,
+      isStatic: true,
+      get({ client }) {
+        return Cascade.$({ ...session(client).$ })
+          .$(async ($) => {
+            if (
+              !$.session.userId ||
+              !(await UserStore.exists({ _id: $.session.userId }))
+            ) {
+              const userId = await Users.actions._init();
+              session(client).actions._update({ userId });
+              throw DEFER_RESULT;
+            } else {
+              const user = Users.$[$.session.userId];
+              return $({ user, roomId: user.$._roomId });
+            }
+          })
+          .$(($) => {
+            const room =
+              typeof $.roomId === "string" ? Rooms.$[$.roomId] : null;
+            return $({ room, gameId: room?.$._gameId, roomId: null });
+          })
+          .$(($) => {
+            const game =
+              typeof $.gameId === "string" ? Games.$[$.gameId] : null;
+            return { user: $.user, room: $.room, game };
+          });
+      },
+    },
+  },
+
   actions: {
-    update: {
-      requireTarget: true,
+    _update: {
       async exec({ target }, data) {
         await SessionStore.findByIdAndUpdate(
           target.id,
@@ -61,9 +108,9 @@ const model: Model<
               `session.${key}`,
               value,
             ])
-          ),
-          { new: true }
+          )
         ).exec();
+
         return {
           notify: target.handle(`.session`),
         };
@@ -77,16 +124,12 @@ const model: Model<
 ////////////////////
 
 export function session(client: Client) {
-  return Sessions.resource(client.sessionId);
+  return Sessions.$[client.sessionId];
 }
 
-export function sessionData(client: Client) {
-  return Sessions.resource(client.sessionId).field(Sessions, "session");
-}
+///////////
+// STORE //
+///////////
 
-//////////////////
-// MAIN EXPORTS //
-//////////////////
-
-export const SessionStore = store(model, true);
-export const Sessions = MongoDatabase.collection(model);
+const SessionStore = store(model, true);
+export const Sessions = MongoSupplier.collection(model);

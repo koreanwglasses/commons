@@ -1,6 +1,0 @@
-{
-  "extends": "@koreanwglasses/commons-core",
-  "compilerOptions": {
-    "outDir": "dist",
-  }
-}

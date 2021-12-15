@@ -40,7 +40,7 @@ export class Commons {
     this.makeClient = makeClient;
 
     this.io.on("connect", (socket) => {
-      debug(`New connection: ${socket.id}`);
+      debug(`> New connection on ${socket.id}`);
     });
   }
 
@@ -197,7 +197,7 @@ export class Commons {
     }
 
     if (path.length === 0) {
-      debug("> packing...");
+      debug("> packing");
       return this.pack(client, base);
     }
 
@@ -209,10 +209,10 @@ export class Commons {
     if (path.length === 1) {
       if (method === "GET") {
         if (isCommons) {
-          debug("> packing...");
+          debug("> packing");
           return this.pack(client, base.query(client, path[0], ...params));
         } else {
-          debug("> packing...");
+          debug("> packing");
           return this.pack(client, base);
         }
       }
@@ -220,7 +220,7 @@ export class Commons {
         if (!isCommons) {
           throw BAD_REQUEST("Cannot post to a non-commons object");
         }
-        debug("> packing...");
+        debug("> packing");
         return this.pack(client, base.action(client, path[0], ...params));
       }
     }
@@ -260,27 +260,34 @@ export class Commons {
       const socket = this.io.sockets.get(socketId);
       if (!socket) throw BAD_REQUEST("Could not find socket");
 
-      const dataKey = uuid();
-      debug(`Opening cascade on ${socket.id} (${req.path})`);
+      const dataKey = nanoid();
+
+      const debugRoute = `${collection.model.name}:${req.path}`;
+      const devDebugInfo = `of ${dataKey.slice(0, 4)}... from ${debugRoute} to ${socket.id.slice(0, 4)}...`;
+      debug(`> Opening cascade ${devDebugInfo}`);
 
       const last: { result: any } = { result: undefined };
       socket.on(`cascade:${dataKey}:resend`, () => {
-        debug(`Resending data on ${socket.id} (${req.path})`);
+        debug(`> Resending ${devDebugInfo}`);
         socket.emit(`cascade:${dataKey}:value`, last.result);
       });
 
       const pipe = cascade
         .p(this.shortenRefs)
         .p((value) => {
+          debug(`> Sending diff ${devDebugInfo}`);
+
           const diff = jsonpatch.compare(last, { result: value });
           last.result = value;
           socket.emit(`cascade:${dataKey}:diff`, diff, hash(value));
         })
         .catch((error) => {
           console.error(
-            `Error from cascade ${
-              process.env.NODE_ENV === "development" ? `on ${socket.id} ` : ""
-            }(${collection.model.name}:${req.path}):\n`,
+            `Error in cascade ${
+              process.env.NODE_ENV === "development"
+                ? devDebugInfo
+                : `from ${debugRoute}`
+            }\n`,
             error
           );
 
@@ -292,7 +299,7 @@ export class Commons {
         });
 
       const close = () => {
-        debug(`Closing cascade on ${socket.id} (${req.path})`);
+        debug(`> Closing cascade ${devDebugInfo}`);
         pipe.close();
       };
 
@@ -306,8 +313,7 @@ export class Commons {
       const req = req_ as Request;
       const res = res_ as Response;
 
-      if (process.env.NODE_ENV === "development")
-        console.log("received request for", req.path);
+      debug(`> Received request for ${collection.model.name}:${req.path}`);
 
       try {
         const client = this.makeClient(req);

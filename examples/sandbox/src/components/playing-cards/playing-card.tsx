@@ -6,7 +6,7 @@ export const PlayingCard = ({
   card,
   width = 80,
 }: {
-  card: Card;
+  card: Card | "back";
   width?: number;
 }) => {
   return (

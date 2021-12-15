@@ -1,16 +1,16 @@
-import { Button, CircularProgress, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, Typography } from "@mui/material";
 import { Layout } from "../components/layout";
 import { Flex, RFlex } from "../components/flex";
-import { User } from "../resources/user";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Room } from "../resources/room";
-import { Game, Card } from "../resources/game";
-import { KeyboardArrowLeft } from "@mui/icons-material";
+import { Card } from "../resources/game";
+import { GifBoxSharp, KeyboardArrowLeft } from "@mui/icons-material";
 import { useRouter } from "next/dist/client/router";
 import { CardHand } from "../components/playing-cards/cards-hand";
 import { useQuery } from "@koreanwglasses/commons-beta/react";
 import { Unpacked } from "@koreanwglasses/commons-beta/client";
 import { ClientState } from "../resources/session";
+import { PlayingCard } from "../components/playing-cards/playing-card";
+import FlipMove from "react-flip-move";
 
 const GameContext = createContext<{
   state: Unpacked<ClientState>;
@@ -83,6 +83,34 @@ const GameView = () => {
           }}
         />
       </RFlex>
+      <TableCards />
     </>
+  );
+};
+
+const TableCards = () => {
+  const { state } = useContext(GameContext)!;
+  const cardWidth = 100;
+  return (
+    <Flex position="absolute">
+      {state.game?.state?.players
+        .filter((player) => !player?.isSelf)
+        .map((player, i) => (
+          <Box key={i} position="relative">
+            <FlipMove>
+              {player?.cards?.map((cardAlias) => (
+                <Box
+                  key={cardAlias}
+                  sx={{ position: "relative", width: cardWidth / 2, display: "inline-block" }}
+                >
+                  <Box sx={{ position: "relative", width: cardWidth }}>
+                    <PlayingCard card="back" width={cardWidth} />
+                  </Box>
+                </Box>
+              ))}
+            </FlipMove>
+          </Box>
+        ))}
+    </Flex>
   );
 };

@@ -1,19 +1,20 @@
 services:
   app:
     image: node:latest
-    command: sh -c "yarn set version berry && yarn && yarn dev"
+    command: >
+      bash -c "
+        cp -rf /host/package.json /host/packages /commons/ &&
+        yarn set version berry &&
+        yarn install &&
+        yarn dev
+      "
     ports:
       - 5000:3000
     working_dir: /commons/examples/sandbox
     volumes:
-      - ../../package.json:/commons/package.json
-      - ../../packages:/commons/packages
+      - commons:/commons
+      - ../..:/host:ro
       - .:/commons/examples/sandbox
-
-      - node_modules_root:/commons/node_modules
-      - node_modules_sandbox:/commons/examples/sandbox/node_modules
-      - node_modules_beta:/commons/packages/beta/node_modules
-      - node_modules_core:/commons/packages/core/node_modules
 
     environment:
       DB_HOST: mongo
@@ -44,7 +45,4 @@ services:
 
 volumes:
   data:
-  node_modules_root:
-  node_modules_sandbox:
-  node_modules_beta:
-  node_modules_core:
+  commons:

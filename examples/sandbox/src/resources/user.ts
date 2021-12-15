@@ -11,10 +11,9 @@ import {
 } from "@koreanwglasses/commons-core";
 
 import { MongoSupplier, store } from "../backend/database";
-import { Room, Rooms } from "./room";
+import { Rooms } from "./room";
 import { ValidationError } from "./lib/error";
 import { session } from "./session";
-import { Game, Games, GameStore } from "./game";
 
 ///////////////////////
 // TYPE DECLARATIONS //
@@ -70,12 +69,11 @@ function ROOM_ONLY(this: Users, target: User | null, client: Client) {
   return Cascade.$({
     clientState: session(client).queries.state.as(client),
     targetRoomId: target.$._roomId,
-  })
-    .$(($) =>
-      $.clientState.room?.id && $.clientState.room.id === $.targetRoomId
-        ? ACCESS_ALLOW
-        : ACCESS_DENY
-    );
+  }).$(($) =>
+    $.clientState.room?.id && $.clientState.room.id === $.targetRoomId
+      ? ACCESS_ALLOW
+      : ACCESS_DENY
+  );
 }
 
 //////////////////////
@@ -140,6 +138,7 @@ const model: UserModel = {
           notify: [
             ...target.handle("._roomId"),
             ...(prevRoomId ? Rooms.$[prevRoomId].handle("/players?") : []),
+            ...(_roomId ? Rooms.$[_roomId].handle("/players?") : []),
           ],
         };
       },

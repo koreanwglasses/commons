@@ -1,4 +1,4 @@
-FROM node:17
+FROM node:latest
 WORKDIR /commons/examples/sandbox
 RUN yarn set version berry
 COPY ../../package.json ../../package.json

@@ -197,6 +197,7 @@ export class Commons {
     }
 
     if (path.length === 0) {
+      debug("> packing...");
       return this.pack(client, base);
     }
 
@@ -208,8 +209,10 @@ export class Commons {
     if (path.length === 1) {
       if (method === "GET") {
         if (isCommons) {
+          debug("> packing...");
           return this.pack(client, base.query(client, path[0], ...params));
         } else {
+          debug("> packing...");
           return this.pack(client, base);
         }
       }
@@ -217,6 +220,7 @@ export class Commons {
         if (!isCommons) {
           throw BAD_REQUEST("Cannot post to a non-commons object");
         }
+        debug("> packing...");
         return this.pack(client, base.action(client, path[0], ...params));
       }
     }
@@ -316,7 +320,7 @@ export class Commons {
 
         const params =
           method === "GET"
-            ? JSON.parse(req.query.params as string ?? "[]")
+            ? JSON.parse((req.query.params as string) ?? "[]")
             : req.body.params ?? [];
 
         const result = this.resolve(

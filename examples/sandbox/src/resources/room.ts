@@ -15,6 +15,7 @@ import { generateSlug } from "random-word-slugs";
 import { User, Users, UserStore } from "./user";
 import { Cascade } from "@koreanwglasses/cascade";
 import { Game, Games } from "./game";
+import { App } from "./app";
 
 ///////////////////////
 // TYPE DECLARATIONS //
@@ -33,7 +34,6 @@ type Fields = {
 };
 
 type Queries = {
-  game(): Game | null;
   players: () => {
     user: User;
     isSelf: boolean;
@@ -62,7 +62,7 @@ type RoomModel = Model<Fields, Queries, Actions>;
 function MEMBERS_ONLY(this: Rooms, target: Room | null, client: Client) {
   if (!target) return ACCESS_DENY;
 
-  return Cascade.$({ clientState: session(client).queries.state.as(client) }).$(
+  return Cascade.$({ clientState: App.queries.state.as(client) }).$(
     ($) =>
       $.clientState.room?.id && $.clientState.room.id === target.id
         ? ACCESS_ALLOW
@@ -107,15 +107,7 @@ const model: RoomModel = {
     },
   },
 
-  queries: {
-    game: {
-      policy: MEMBERS_ONLY,
-      async get({ target }) {
-        return Cascade.$({ gameId: target.$._gameId }).$(($) =>
-          typeof $.gameId === "string" ? Games.$[$.gameId] : null
-        );
-      },
-    },
+  queries: { 
     players: {
       policy: MEMBERS_ONLY,
       autoFetch: true,

@@ -24,8 +24,6 @@ declare module "@koreanwglasses/commons-core" {
 export type Session = Resource<SessionModel>;
 export type Sessions = Collection<SessionModel>;
 
-export type ClientState = { user: User; room: Room | null; game: Game | null };
-
 type Fields = {
   _id: string;
   session: {
@@ -33,9 +31,7 @@ type Fields = {
   };
 };
 
-type Queries = {
-  state(): ClientState;
-};
+type Queries = {};
 
 type Actions = {
   _update(data: Partial<Fields["session"]>): void;
@@ -61,39 +57,6 @@ const model: SessionModel = {
     session: {
       type: {
         userId: String,
-      },
-    },
-  },
-
-  queries: {
-    state: {
-      policy: ALLOW_ALL,
-      isStatic: true,
-      get({ client }) {
-        return Cascade.$({ ...session(client).$ })
-          .$(async ($) => {
-            if (
-              !$.session.userId ||
-              !(await UserStore.exists({ _id: $.session.userId }))
-            ) {
-              const userId = await Users.actions._init();
-              session(client).actions._update({ userId });
-              throw DEFER_RESULT;
-            } else {
-              const user = Users.$[$.session.userId];
-              return $({ user, roomId: user.$._roomId });
-            }
-          })
-          .$(($) => {
-            const room =
-              typeof $.roomId === "string" ? Rooms.$[$.roomId] : null;
-            return $({ room, gameId: room?.$._gameId, roomId: null });
-          })
-          .$(($) => {
-            const game =
-              typeof $.gameId === "string" ? Games.$[$.gameId] : null;
-            return { user: $.user, room: $.room, game };
-          });
       },
     },
   },

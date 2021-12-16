@@ -14,6 +14,7 @@ import { MongoSupplier, store } from "../backend/database";
 import { Rooms } from "./room";
 import { ValidationError } from "./lib/error";
 import { session } from "./session";
+import { App } from "./app";
 
 ///////////////////////
 // TYPE DECLARATIONS //
@@ -67,7 +68,7 @@ function ROOM_ONLY(this: Users, target: User | null, client: Client) {
   if (!target) return ACCESS_DENY;
 
   return Cascade.$({
-    clientState: session(client).queries.state.as(client),
+    clientState: App.queries.state.as(client),
     targetRoomId: target.$._roomId,
   }).$(($) =>
     $.clientState.room?.id && $.clientState.room.id === $.targetRoomId

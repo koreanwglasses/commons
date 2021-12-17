@@ -11,7 +11,6 @@ import {
 import asyncHandler from "express-async-handler";
 import express, { Request, Response, Router } from "express";
 import { Server, Namespace } from "socket.io";
-import { v4 as uuid } from "uuid";
 import hash from "object-hash";
 import jsonpatch from "fast-json-patch";
 import { customRandom, nanoid, urlAlphabet } from "nanoid";
@@ -55,7 +54,7 @@ export class Commons {
     return Cascade.$({ value }).$(({ value }) => {
       if (value instanceof Resource) {
         if (value.id in refs)
-          return { result: { __commons_ref: value.id }, refs: {} };
+          return { result: { __commons_ref: value.id }, refs };
 
         return Cascade.$({
           packed: this.pack(client, value.fetch(client), {
@@ -68,7 +67,6 @@ export class Commons {
         }).$(($) => ({
           result: { __commons_ref: value.id },
           refs: {
-            ...refs,
             ...$.packed.refs,
             [value.id]: {
               ...($.packed.result as object),
@@ -78,7 +76,7 @@ export class Commons {
         }));
       } else if (value instanceof Collection) {
         if (value.model.name in refs)
-          return { result: { __commons_ref: value.model.name }, refs: {} };
+          return { result: { __commons_ref: value.model.name }, refs };
 
         return Cascade.$({
           packed: this.pack(client, value.fetch(client), {
@@ -91,7 +89,6 @@ export class Commons {
         }).$(($) => ({
           result: { __commons_ref: value.model.name },
           refs: {
-            ...refs,
             ...$.packed.refs,
             [value.model.name]: {
               ...$($.packed.result as object),
@@ -104,29 +101,29 @@ export class Commons {
           Cascade<{ result: any[]; refs: Record<string, any> }>
         >(
           (acc, value) =>
-            Cascade.$({ acc })
-              .$(($) => $({ contents: this.pack(client, value, $.acc.refs) }))
-              .$(($) => ({
-                result: [...$.acc.result, $.contents.result],
-                refs: { ...$.acc.refs, ...$.contents.refs },
-              })),
-          Cascade.const({ result: [], refs: {} })
+            acc
+              .$(($) => $({ packed: this.pack(client, value, $.refs) }))
+              .$(($) => {
+                $.result.push($.packed.result);
+                $.refs = $.packed.refs;
+                return $({ packed: undefined });
+              }),
+          Cascade.$({ result: [] as any[], refs })
         );
       } else if (value && typeof value === "object") {
-        return Object.entries(value).reduce<
-          Cascade<{ result: Record<any, any>; refs: Record<string, any> }>
-        >(
+        return Object.entries(value).reduce(
           (acc, [key, value]) =>
-            Cascade.$({ acc })
-              .$(($) => $({ contents: this.pack(client, value, $.acc.refs) }))
-              .$(($) => ({
-                result: { ...$.acc.result, [key]: $.contents.result },
-                refs: { ...$.acc.refs, ...$.contents.refs },
-              })),
-          Cascade.const({ result: {}, refs: {} })
+            acc
+              .$(($) => $({ packed: this.pack(client, value, $.refs) }))
+              .$(($) => {
+                $.result[key] = $.packed.result;
+                $.refs = $.packed.refs;
+                return $({ packed: undefined });
+              }),
+          Cascade.$({ result: {} as any, refs })
         );
       } else {
-        return { result: value, refs: {} };
+        return { result: value, refs };
       }
     });
   }
@@ -263,7 +260,10 @@ export class Commons {
       const dataKey = nanoid();
 
       const debugRoute = `${collection.model.name}:${req.path}`;
-      const devDebugInfo = `of ${dataKey.slice(0, 4)}... from ${debugRoute} to ${socket.id.slice(0, 4)}...`;
+      const devDebugInfo = `of ${dataKey.slice(
+        0,
+        4
+      )}... from ${debugRoute} to ${socket.id.slice(0, 4)}...`;
       debug(`> Opening cascade ${devDebugInfo}`);
 
       const last: { result: any } = { result: undefined };

@@ -108,58 +108,57 @@ export default function commons({
 
   // Define exported functions
   const unpack = (packed: Packed) => {
-    let prefix = packed.path.endsWith("/")
-      ? packed.path.slice(0, -1)
-      : packed.path;
+    const join = (...parts: string[]) =>
+      parts.map((part) => (part.endsWith("/") ? part : part + "/")).join("");
+
+    const isRef = (value: any) =>
+      value && typeof value === "object" && "__commons_ref" in value;
 
     const refs = {} as any;
-    const resolve = (actionPrefix: string, packed: any): any => {
-      if (packed && typeof packed === "object" && "__commons_ref" in packed) {
-        return refs[(packed as any).__commons_ref](actionPrefix);
-      } else if (packed && typeof packed === "object") {
-        const result = {};
-        Object.entries(packed).forEach(([key, value]) => {
-          if (Array.isArray(value)) {
-            Object.defineProperty(result, key, {
-              get() {
-                return value.map((value, i) =>
-                  resolve(actionPrefix + "/" + key + "/" + i, value)
-                );
-              },
-            });
-          } else {
-            Object.defineProperty(result, key, {
-              get() {
-                return resolve(actionPrefix + "/" + key, value);
-              },
-            });
-          }
-        });
-        return result;
+
+    const link = (path: string, value: any): any => {
+      if (isRef(value)) {
+        return refs[value.__commons_ref](path);
+      } else if (Array.isArray(value)) {
+        return value.map((item, i) => link(join(path, `${i}`), item));
+      } else if (value && typeof value === "object") {
+        return Object.fromEntries(
+          Object.entries(value).map(([key, value]) => [
+            key,
+            link(join(path, key), value),
+          ])
+        );
       } else {
-        return packed;
+        return value;
       }
     };
 
     Object.entries(packed.refs).forEach(([key, data]) => {
-      const { __commons_list, ...packed } = data;
+      const { __commons_list, ...result } = data;
 
-      refs[key] = (actionPrefix: string) => {
+      refs[key] = (path: string) => {
         const actions = {} as any;
 
         (__commons_list as string[]).forEach((item) => {
           if (item.startsWith("/") && !item.endsWith("?")) {
             const name = item.slice(1);
             actions[name] = (...params: any) =>
-              action(actionPrefix.slice(1) + "/" + name, ...params);
+              action(join(path, name), ...params);
           }
         });
 
-        return { state: resolve(actionPrefix, packed), actions };
+        return {
+          get state() {
+            return link(path, result);
+          },
+          actions,
+        };
       };
     });
 
-    return resolve("", { [prefix]: packed.result })[prefix];
+    const result = link(packed.path, packed.result);
+    console.debug("Unpacked", result);
+    return result;
   };
 
   const query = (path: string, ...params: any) => {

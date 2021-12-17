@@ -97,31 +97,35 @@ export class Commons {
           },
         }));
       } else if (Array.isArray(value)) {
-        return value.reduce<
-          Cascade<{ result: any[]; refs: Record<string, any> }>
-        >(
-          (acc, value) =>
-            acc
-              .$(($) => $({ packed: this.pack(client, value, $.refs) }))
-              .$(($) => {
-                $.result.push($.packed.result);
-                $.refs = $.packed.refs;
-                return $({ packed: undefined });
-              }),
-          Cascade.$({ result: [] as any[], refs })
-        );
+        return value
+          .reduce<Cascade<{ result: any[]; refs: Record<string, any> }>>(
+            (acc, value) =>
+              acc
+                .$(($) => $({ packed: this.pack(client, value, $.refs) }))
+                .$(($) => {
+                  $.result.push($.packed.result);
+                  $.refs = $.packed.refs;
+                  return $({
+                    packed: undefined,
+                  });
+                }),
+            Cascade.$({ result: [] as any[], refs })
+          )
       } else if (value && typeof value === "object") {
-        return Object.entries(value).reduce(
-          (acc, [key, value]) =>
-            acc
-              .$(($) => $({ packed: this.pack(client, value, $.refs) }))
-              .$(($) => {
-                $.result[key] = $.packed.result;
-                $.refs = $.packed.refs;
-                return $({ packed: undefined });
-              }),
-          Cascade.$({ result: {} as any, refs })
-        );
+        return Object.entries(value)
+          .reduce(
+            (acc, [key, value]) =>
+              acc
+                .$(($) => $({ packed: this.pack(client, value, $.refs) }))
+                .$(($) => {
+                  $.result[key] = $.packed.result;
+                  $.refs = $.packed.refs;
+                  return $({
+                    packed: undefined,
+                  });
+                }),
+            Cascade.$({ result: {} as any, refs })
+          )
       } else {
         return { result: value, refs };
       }
@@ -144,33 +148,40 @@ export class Commons {
       return result;
     };
 
-    const newKeys = new Set<string>(Object.keys(packed.refs));
     const refsRemap = {} as Record<string, string>;
 
+    const newKeys = new Set<string>(Object.keys(packed.refs));
     Object.keys(packed.refs).forEach((key) =>
       newKeys.add((refsRemap[key] = shorten(key, newKeys)))
     );
 
-    Object.entries(refsRemap).forEach(([key, newKey]) => {
-      packed.refs[newKey] = packed.refs[key];
-      delete packed.refs[key];
-    });
-
-    const recursiveReplace = (value: unknown) => {
-      if (!value || typeof value !== "object") return value;
-      for (const key in value) {
-        if (key === "__commons_ref") {
-          (value as any)[key] = refsRemap[(value as any)[key]];
-        } else {
-          recursiveReplace((value as any)[key]);
+    const remap = (value: any): any => {
+      if (Array.isArray(value)) {
+        return value.map(remap);
+      } else if (value && typeof value === "object") {
+        const remapped = {} as any;
+        for (const key in value) {
+          if (key === "__commons_ref") {
+            remapped[key] = refsRemap[value[key]];
+          } else {
+            remapped[key] = remap(value[key]);
+          }
         }
+        return remapped;
+      } else {
+        return value;
       }
     };
 
-    recursiveReplace(packed);
+    const refs = Object.fromEntries(
+      Object.entries(packed.refs).map(([key, value]) => [
+        refsRemap[key],
+        remap(value),
+      ])
+    );
+    const result = remap(packed.result);
 
-    // Do json-round trip so it can be diffed properly
-    return JSON.parse(JSON.stringify(packed));
+    return { refs, result };
   }
 
   /**

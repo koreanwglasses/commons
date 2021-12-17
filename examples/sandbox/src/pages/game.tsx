@@ -129,7 +129,7 @@ const TableCards = () => {
                 width={handWidth}
                 textAlign="center"
                 sx={{
-                  transform: `rotate(${theta + Math.PI / 2}rad)`,
+                  transform: `rotate(${theta + Math.PI / 2}rad) translateX(-20px)`,
                 }}
               >
                 <FlipMove>

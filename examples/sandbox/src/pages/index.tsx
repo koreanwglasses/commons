@@ -15,7 +15,6 @@ import { Layout } from "../components/layout";
 import { Flex, RFlex } from "../components/flex";
 import { FlexForm } from "../components/flex-form";
 import SwipeableView from "react-swipeable-views";
-import { User } from "../resources/user";
 import {
   ContentCopy,
   KeyboardArrowLeft,
@@ -28,19 +27,18 @@ import { Room } from "../resources/room";
 import { EditableText } from "../components/editable-text";
 import copy from "copy-to-clipboard";
 import { Refresh } from "../components/refresh";
-import { Game } from "../resources/game";
 import { useRouter } from "next/dist/client/router";
-import { useCommons, useQuery } from "@koreanwglasses/commons-beta/react";
-import { ClientState } from "../resources/session";
+import { useQuery } from "@koreanwglasses/commons-beta/react";
+import { AppState } from "../resources/app";
 
 const IndexContext = createContext<{
   setIndex: React.Dispatch<React.SetStateAction<number>>;
   setErr: React.Dispatch<React.SetStateAction<Error | null>>;
-  state: Unpacked<ClientState>;
+  state: Unpacked<AppState>;
 } | null>(null);
 
 const Loader = () => {
-  const state = useQuery<ClientState>("/api/app/state");
+  const state = useQuery<AppState>("/api/app/state");
 
   const router = useRouter();
   useEffect(() => {
@@ -61,7 +59,7 @@ const Loader = () => {
 
 export default Loader;
 
-const HomePage = ({ state }: { state: Unpacked<ClientState> }) => {
+const HomePage = ({ state }: { state: Unpacked<AppState> }) => {
   const [index, setIndex] = useState(
     state.room?.state?.players ? 2 : state.user?.state?.username ? 1 : 0
   );
@@ -186,7 +184,7 @@ const Slide2 = () => {
       <RFlex gap={1}>
         <Button
           onClick={() => {
-            state.user?.actions?.leaveRoom()
+            state.user?.actions?.leaveRoom();
             setIndex(1);
           }}
         >

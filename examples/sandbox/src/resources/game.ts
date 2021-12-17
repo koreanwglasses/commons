@@ -46,7 +46,7 @@ type Fields = {
 
 type Queries = {
   players(): {
-    user: User;
+    user: User | null;
     cards: string[];
     isSelf: boolean;
     isActive: boolean;
@@ -115,14 +115,16 @@ const model: GameModel = {
         }).$(($) =>
           Cascade.all(
             $.players.map((player) =>
-              Cascade.$({ user: Users.$[player.id] }).$(({ user }) => {
-                return {
-                  user,
-                  cards: player.cards.map((card) => $.cardAliases[card]!),
-                  isSelf: player.id === $.session.userId,
-                  isActive: player.id === $.activePlayerId,
-                };
-              })
+              Cascade.$({ user: player.id ? Users.$[player.id] : null }).$(
+                ({ user }) => {
+                  return {
+                    user,
+                    cards: player.cards.map((card) => $.cardAliases[card]!),
+                    isSelf: player.id === $.session.userId,
+                    isActive: player.id === $.activePlayerId,
+                  };
+                }
+              )
             )
           )
         );
@@ -149,14 +151,16 @@ const model: GameModel = {
 
         const hands = deal();
 
+        const _playerIds = [...playerIds, null, null, null, null, null, null].slice(0, 6);
+
         const gameId = (
           await GameStore.create({
-            _players: playerIds.map((id, i) => ({
+            _players: _playerIds.map((id, i) => ({
               id,
               cards: hands[i],
             })),
             _cardAliases: Object.fromEntries(
-              playerIds
+              _playerIds
                 .map((_, i) => hands[i].map((card, j) => [card, `${i},${j}`]))
                 .flat()
             ),
